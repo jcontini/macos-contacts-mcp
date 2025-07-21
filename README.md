@@ -37,10 +37,6 @@ Add this configuration to your MCP client:
 }
 ```
 
-**Config file locations:**
-- **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Cursor:** `.cursor/mcp.json` in your project folder
-
 ### 3. Grant Permissions
 
 When you first use the contacts features, macOS will ask for permission:
