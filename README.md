@@ -115,16 +115,6 @@ These improvements will make installation as simple as a single click or command
 
 Based on real-world usage with LLMs, the following improvements would make this MCP more robust:
 
-### Better Special Character Handling
-- **Issue**: AppleScript generation fails when contact notes contain apostrophes or other special characters (e.g., "Mike Ng's birthday party" causes syntax errors)
-- **Solution**: Implement proper character escaping in AppleScript string generation
-- **Why**: LLMs naturally include punctuation and special characters in notes and names, so the underlying AppleScript should handle these gracefully
-
-### Input Sanitization & Validation
-- **Issue**: LLMs don't intuitively know which characters will break AppleScript
-- **Solution**: Either sanitize inputs automatically or provide clear error messages about problematic characters
-- **Why**: LLMs should be able to use natural language without worrying about underlying implementation details
-
 ### Graceful Error Handling
 - **Issue**: AppleScript syntax errors don't provide helpful feedback to LLMs about what went wrong
 - **Solution**: Catch AppleScript errors and translate them into actionable error messages
