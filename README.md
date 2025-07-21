@@ -84,3 +84,29 @@ You can store and manage social media profiles for contacts:
 - An MCP-compatible AI assistant
 
 Works with Claude Desktop, Cursor, and any other app that supports the Model Context Protocol.
+
+## Future Plans
+
+We're working on easier distribution methods to eliminate the need for manual installation:
+
+### Desktop Extensions (.dxt)
+Claude Desktop now supports one-click installation via Desktop Extensions. We plan to package this server as a `.dxt` file for:
+- **No manual setup** - double-click to install
+- **No dependencies** - Claude Desktop includes Node.js runtime
+- **Automatic updates** - seamless version management
+- **Curated directory** - discover through Claude Desktop's extension marketplace
+
+### NPM Distribution
+For developers who prefer package managers:
+- **NPX support**: `npx macos-contacts-mcp` for instant usage
+- **Global installation**: `npm install -g macos-contacts-mcp`  
+- **Version management**: Easy updates via npm
+
+### MCP Directory Listings
+We're submitting to major MCP directories for better discoverability:
+- **[Glama.ai](https://glama.ai/mcp/servers)** - Comprehensive MCP marketplace with quality ratings
+- **[PulseMCP](https://www.pulsemcp.com/)** - Clean directory with 5000+ servers and filters
+- **[McpServers.org](https://mcpservers.org/)** - Community-driven MCP server registry
+- **[Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers)** - GitHub-based curated list
+
+These improvements will make installation as simple as a single click or command while maintaining the same powerful local contact management capabilities.
