@@ -255,11 +255,23 @@ class MacOSContactsServer {
     });
   }
 
+  private escapeForAppleScript(str: string): string {
+    // Simple escaping for AppleScript string literals
+    // Only escape the most essential characters
+    return str
+      .replace(/\\/g, '\\\\')     // Escape backslashes first  
+      .replace(/"/g, '\\"')       // Escape double quotes
+      .replace(/\n/g, '\\n')      // Escape newlines
+      .replace(/\r/g, '\\r')      // Escape carriage returns
+      .replace(/\t/g, '\\t');     // Escape tabs
+  }
+
   private executeAppleScript(script: string): string {
     try {
-      const result = execSync(`osascript -e '${script.replace(/'/g, "\\'")}'`, {
+      // Use stdin to pass the script, avoiding shell escaping issues entirely
+      const result = execSync(`osascript`, {
+        input: script,
         encoding: 'utf8',
-        // Remove timeout to test if that's causing the -10000 error
       }).trim();
       return result;
     } catch (error: any) {
@@ -425,24 +437,24 @@ end tell`;
       tell application "Contacts"
         set newPerson to make new person
         
-        if "${firstName}" is not "" then
-          set first name of newPerson to "${firstName}"
+        if "${this.escapeForAppleScript(firstName)}" is not "" then
+          set first name of newPerson to "${this.escapeForAppleScript(firstName)}"
         end if
         
-        if "${lastName}" is not "" then
-          set last name of newPerson to "${lastName}"
+        if "${this.escapeForAppleScript(lastName)}" is not "" then
+          set last name of newPerson to "${this.escapeForAppleScript(lastName)}"
         end if
         
-        if "${organization}" is not "" then
-          set organization of newPerson to "${organization}"
+        if "${this.escapeForAppleScript(organization)}" is not "" then
+          set organization of newPerson to "${this.escapeForAppleScript(organization)}"
         end if
         
-        if "${job_title}" is not "" then
-          set job title of newPerson to "${job_title}"
+        if "${this.escapeForAppleScript(job_title)}" is not "" then
+          set job title of newPerson to "${this.escapeForAppleScript(job_title)}"
         end if
         
-        if "${note}" is not "" then
-          set note of newPerson to "${note}"
+        if "${this.escapeForAppleScript(note)}" is not "" then
+          set note of newPerson to "${this.escapeForAppleScript(note)}"
         end if
     `;
 
@@ -450,7 +462,7 @@ end tell`;
     if (emails.length > 0) {
       emails.forEach((email: string, index: number) => {
         const label = index === 0 ? 'home' : index === 1 ? 'work' : `email${index + 1}`;
-        script += `\n        make new email at end of emails of newPerson with properties {label:"${label}", value:"${email}"}`;
+        script += `\n        make new email at end of emails of newPerson with properties {label:"${label}", value:"${this.escapeForAppleScript(email)}"}`;
       });
     }
 
@@ -458,14 +470,14 @@ end tell`;
     if (phones.length > 0) {
       phones.forEach((phone: string, index: number) => {
         const label = index === 0 ? 'home' : index === 1 ? 'work' : `phone${index + 1}`;
-        script += `\n        make new phone at end of phones of newPerson with properties {label:"${label}", value:"${phone}"}`;
+        script += `\n        make new phone at end of phones of newPerson with properties {label:"${label}", value:"${this.escapeForAppleScript(phone)}"}`;
       });
     }
 
     // Add URLs
     if (urls.length > 0) {
       urls.forEach((url: any) => {
-        script += `\n        make new url at end of urls of newPerson with properties {label:"${url.label}", value:"${url.value}"}`;
+        script += `\n        make new url at end of urls of newPerson with properties {label:"${this.escapeForAppleScript(url.label)}", value:"${this.escapeForAppleScript(url.value)}"}`;
       });
     }
 
@@ -501,12 +513,33 @@ end tell`;
     const contactId = existingContact.contact.id;
     const updatedFields: string[] = [];
 
+    // Update name if provided
+    if (updates.name !== undefined) {
+      try {
+        // Parse name into first/last name
+        const nameParts = updates.name.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+        
+        const script = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"
+  set first name of targetPerson to "${this.escapeForAppleScript(firstName)}"
+  set last name of targetPerson to "${this.escapeForAppleScript(lastName)}"
+  save
+end tell`;
+        this.executeAppleScript(script);
+        updatedFields.push('name');
+      } catch (error) {
+        console.error('Failed to update name:', error);
+      }
+    }
+
     // Update basic properties one by one
     if (updates.organization !== undefined) {
       try {
         const script = `tell application "Contacts"
   set targetPerson to person id "${contactId}"
-  set organization of targetPerson to "${updates.organization}"
+  set organization of targetPerson to "${this.escapeForAppleScript(updates.organization)}"
   save
 end tell`;
         this.executeAppleScript(script);
@@ -520,7 +553,7 @@ end tell`;
       try {
         const script = `tell application "Contacts"
   set targetPerson to person id "${contactId}"
-  set job title of targetPerson to "${updates.job_title}"
+  set job title of targetPerson to "${this.escapeForAppleScript(updates.job_title)}"
   save
 end tell`;
         this.executeAppleScript(script);
@@ -534,7 +567,7 @@ end tell`;
       try {
         const script = `tell application "Contacts"
   set targetPerson to person id "${contactId}"
-  set note of targetPerson to "${updates.note}"
+  set note of targetPerson to "${this.escapeForAppleScript(updates.note)}"
   save
 end tell`;
         this.executeAppleScript(script);
@@ -544,8 +577,109 @@ end tell`;
       }
     }
 
-    // For now, skip email/phone/URL updates to avoid complex AppleScript
-    // These can be added later once basic updates work
+    // Update URLs if provided
+    if (updates.urls !== undefined) {
+      try {
+        // First, remove all existing URLs
+        const clearUrlScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"
+  delete every url of targetPerson
+  save
+end tell`;
+        this.executeAppleScript(clearUrlScript);
+
+        // Then add new URLs
+        if (updates.urls.length > 0) {
+          let addUrlScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"`;
+          
+          updates.urls.forEach((url: any) => {
+            addUrlScript += `
+  make new url at end of urls of targetPerson with properties {label:"${this.escapeForAppleScript(url.label)}", value:"${this.escapeForAppleScript(url.value)}"}`;
+          });
+          
+          addUrlScript += `
+  save
+end tell`;
+          
+          this.executeAppleScript(addUrlScript);
+        }
+        
+        updatedFields.push('urls');
+      } catch (error) {
+        console.error('Failed to update URLs:', error);
+      }
+    }
+
+    // Update emails if provided
+    if (updates.emails !== undefined) {
+      try {
+        // First, remove all existing emails
+        const clearEmailScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"
+  delete every email of targetPerson
+  save
+end tell`;
+        this.executeAppleScript(clearEmailScript);
+
+        // Then add new emails
+        if (updates.emails.length > 0) {
+          let addEmailScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"`;
+          
+          updates.emails.forEach((email: string, index: number) => {
+            const label = index === 0 ? 'home' : index === 1 ? 'work' : `email${index + 1}`;
+            addEmailScript += `
+  make new email at end of emails of targetPerson with properties {label:"${label}", value:"${this.escapeForAppleScript(email)}"}`;
+          });
+          
+          addEmailScript += `
+  save
+end tell`;
+          
+          this.executeAppleScript(addEmailScript);
+        }
+        
+        updatedFields.push('emails');
+      } catch (error) {
+        console.error('Failed to update emails:', error);
+      }
+    }
+
+    // Update phones if provided
+    if (updates.phones !== undefined) {
+      try {
+        // First, remove all existing phones
+        const clearPhoneScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"
+  delete every phone of targetPerson
+  save
+end tell`;
+        this.executeAppleScript(clearPhoneScript);
+
+        // Then add new phones
+        if (updates.phones.length > 0) {
+          let addPhoneScript = `tell application "Contacts"
+  set targetPerson to person id "${contactId}"`;
+          
+          updates.phones.forEach((phone: string, index: number) => {
+            const label = index === 0 ? 'home' : index === 1 ? 'work' : `phone${index + 1}`;
+            addPhoneScript += `
+  make new phone at end of phones of targetPerson with properties {label:"${label}", value:"${this.escapeForAppleScript(phone)}"}`;
+          });
+          
+          addPhoneScript += `
+  save
+end tell`;
+          
+          this.executeAppleScript(addPhoneScript);
+        }
+        
+        updatedFields.push('phones');
+      } catch (error) {
+        console.error('Failed to update phones:', error);
+      }
+    }
     
     return {
       success: true,
